@@ -4,9 +4,17 @@
     <h2>Ваш счёт: {{ score }}</h2>
     <button @click="start">Начать заново</button>
   </div>
-
-  <div id="score">{{ score }}</div>
-  <canvas id="snakeboard" ref="snakeboard" width="400" height="400"></canvas>
+  <div class="score">
+    <div>Ваш счёт: {{ score }}</div>
+    <div>Длина змеи: {{ snake?.length ?? 0 }}</div>
+    <div>Еды на карте: {{ food.length }}</div>
+  </div>
+  <canvas
+    id="snakeboard"
+    ref="snakeboard"
+    :width="boardWidth"
+    :height="boardHeight"
+  ></canvas>
 </template>
 
 <script>
@@ -14,9 +22,10 @@ export default {
   name: "App",
   data() {
     return {
+      food_img: null,
+      board_bg_image: null,
       board_border: "black",
-      board_background: "white",
-      snake_col: "crimson",
+      snake_col: "green",
       snake_border: "darkblue",
 
       snake: null,
@@ -28,29 +37,27 @@ export default {
         { x: 160, y: 200 },
       ],
 
+      foodNum: 10,
+      food: [],
+
       score: 0,
       changing_direction: false,
-      food_x: null,
-      food_y: null,
       dx: 10,
       dy: 0,
-      snakeboard: this.$refs.snakeboard,
       die: false,
+      boardWidth: 400,
+      boardHeight: 400,
     };
   },
 
   mounted() {
-    this.snakeboard = this.$refs.snakeboard;
+    this.snakeboard_ctx = this.$refs.snakeboard.getContext("2d");
     document.addEventListener("keydown", this.change_direction);
     this.start();
   },
 
   computed: {
-    snakeboard_ctx() {
-      return this.snakeboard.getContext("2d");
-    },
-
-    has_game_ended() {
+    endGame() {
       for (let i = 4; i < this.snake.length; i++) {
         if (
           this.snake[i].x === this.snake[0].x &&
@@ -60,32 +67,44 @@ export default {
         }
       }
       const hitLeftWall = this.snake[0].x < 0;
-      const hitRightWall = this.snake[0].x > this.snakeboard.width - 10;
-      const hitToptWall = this.snake[0].y < 0;
-      const hitBottomWall = this.snake[0].y > this.snakeboard.height - 10;
-      return hitLeftWall || hitRightWall || hitToptWall || hitBottomWall;
+      const hitRightWall = this.snake[0].x > this.boardWidth - 10;
+      const hitTopWall = this.snake[0].y < 0;
+      const hitBottomWall = this.snake[0].y > this.boardHeight - 10;
+      return hitLeftWall || hitRightWall || hitTopWall || hitBottomWall;
+    },
+
+    boardImage() {
+      const img = new Image(400, 400);
+      img.src =
+        "http://static9.depositphotos.com/1008280/1225/i/450/depositphotos_12251693-Sand-Texture.jpg";
+      return img;
+    },
+
+    foodImage() {
+      const img = new Image(10, 10);
+      img.src =
+        "https://sun9-9.userapi.com/impg/AQ8m1qpKcB0r_XRi7UPDhkYG9oCQnIFb3EyEwQ/FYGWAroZaYg.jpg?size=10x10&quality=96&sign=09a0fcd6f1d983e86ee875e80e112e95&type=album";
+      return img;
     },
   },
 
   methods: {
     start() {
-      this.score = 0;
       this.die = false;
+      this.board_bg_image = this.boardImage;
+      this.food_img = this.foodImage;
+
+      this.score = 0;
       this.dx = 10;
       this.dy = 0;
-      this.snake = [
-        { x: 200, y: 200 },
-        { x: 190, y: 200 },
-        { x: 180, y: 200 },
-        { x: 170, y: 200 },
-        { x: 160, y: 200 },
-      ];
+      this.snake = JSON.parse(JSON.stringify(this.snakeInit));
+
       this.main();
       this.gen_food();
     },
 
     main() {
-      if (this.has_game_ended) {
+      if (this.endGame) {
         this.die = true;
         return;
       }
@@ -98,24 +117,14 @@ export default {
         this.drawSnake();
 
         this.main();
-      }, 100);
+      }, 70 - this.score);
     },
 
     clear_board() {
-      this.snakeboard_ctx.fillStyle = this.board_background;
-      this.snakeboard_ctx.strokestyle = this.board_border;
-      this.snakeboard_ctx.fillRect(
-        0,
-        0,
-        this.snakeboard.width,
-        this.snakeboard.height
-      );
-      this.snakeboard_ctx.strokeRect(
-        0,
-        0,
-        this.snakeboard.width,
-        this.snakeboard.height
-      );
+      this.snakeboard_ctx.drawImage(this.board_bg_image, 0, 0);
+
+      this.snakeboard_ctx.strokeStyle = this.board_border;
+      this.snakeboard_ctx.strokeRect(0, 0, this.boardWidth, this.boardHeight);
     },
 
     drawSnake() {
@@ -123,27 +132,15 @@ export default {
     },
 
     drawFood() {
-      const img = new Image();
-      img.src = "./assets/apple.png";
-      this.snakeboard_ctx.fillStyle = this.snakeboard_ctx.createPattern(
-        img,
-        "no-repeat"
-      );
-      this.snakeboard_ctx.strokestyle = "white";
-      this.snakeboard_ctx.fillRect(this.food_x, this.food_y, 10, 10);
-      this.snakeboard_ctx.strokeRect(this.food_x, this.food_y, 10, 10);
+      this.food.forEach((food) => {
+        this.snakeboard_ctx.drawImage(this.food_img, food.x, food.y);
+      });
     },
 
-    // Draw one snake part
     drawSnakePart(snakePart) {
-      // Set the colour of the snake part
       this.snakeboard_ctx.fillStyle = this.snake_col;
-      // Set the border colour of the snake part
-      this.snakeboard_ctx.strokestyle = this.snake_border;
-      // Draw a "filled" rectangle to represent the snake part at the coordinates
-      // the part is located
+      this.snakeboard_ctx.strokeStyle = this.snake_border;
       this.snakeboard_ctx.fillRect(snakePart.x, snakePart.y, 10, 10);
-      // Draw a border around the snake part
       this.snakeboard_ctx.strokeRect(snakePart.x, snakePart.y, 10, 10);
     },
 
@@ -152,14 +149,19 @@ export default {
     },
 
     gen_food() {
-      // Generate a random number the food x-coordinate
-      this.food_x = this.random_food(0, this.snakeboard.width - 10);
-      // Generate a random number for the food y-coordinate
-      this.food_y = this.random_food(0, this.snakeboard.height - 10);
-      // if the new food location is where the snake currently is, generate a new food location
+      const foodLength = this.food.length || 1;
+      for (let i = 0; i <= this.foodNum - foodLength; i++) {
+        this.food.push({
+          x: this.random_food(0, this.boardWidth - 10),
+          y: this.random_food(0, this.boardHeight - 10),
+        });
+      }
+
       this.snake.forEach((part) => {
-        const has_eaten = part.x == this.food_x && part.y == this.food_y;
-        if (has_eaten) this.gen_food();
+        const has_eaten = this.has_eaten_food(part);
+        if (has_eaten !== -1) {
+          this.food = this.food.filter((f, idx) => idx !== has_eaten);
+        }
       });
     },
 
@@ -168,8 +170,6 @@ export default {
       const RIGHT_KEY = 39;
       const UP_KEY = 38;
       const DOWN_KEY = 40;
-
-      // Prevent the snake from reversing
 
       if (this.changing_direction) {
         return;
@@ -180,6 +180,7 @@ export default {
       const goingDown = this.dy === 10;
       const goingRight = this.dx === 10;
       const goingLeft = this.dx === -10;
+
       if (keyPressed === LEFT_KEY && !goingRight) {
         this.dx = -10;
         this.dy = 0;
@@ -205,16 +206,27 @@ export default {
       };
 
       this.snake.unshift(head);
-      const has_eaten_food =
-        this.snake[0].x === this.food_x && this.snake[0].y === this.food_y;
-      if (has_eaten_food) {
+
+      if (this.has_eaten_food(this.snake[0]) !== -1) {
         this.score += 1;
         this.gen_food();
       } else {
         this.snake.pop();
       }
     },
+
+    has_eaten_food(part) {
+      let i = -1;
+      this.food.forEach((f, idx) => {
+        if (part.x === f.x && part.y === f.y && i === -1) {
+          i = idx;
+        }
+      });
+      return i;
+    },
   },
+
+  watch: {},
 };
 </script>
 
@@ -246,9 +258,12 @@ export default {
   transform: translate(-50%, -50%);
 }
 
-#score {
-  text-align: center;
-  font-size: 50px;
+.score {
+  position: absolute;
+  top: 50%;
+  left: 20%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
 }
 
 .endgame h2 {
