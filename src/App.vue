@@ -1,14 +1,18 @@
 <template>
-  <div class="endgame" v-if="die">
+  <div class="endgame" v-if="!die">
     <h2>Вы проиграли!</h2>
     <h2>Ваш счёт: {{ score }}</h2>
     <button @click="start">Начать заново</button>
   </div>
+
   <div class="score">
     <div>Ваш счёт: {{ score }}</div>
     <div>Длина змеи: {{ snake?.length ?? 0 }}</div>
     <div>Еды на карте: {{ food.length }}</div>
+    <div>Скорость: {{ timeout }}</div>
+    <div>Скорость: {{ speed }}</div>
   </div>
+
   <canvas
     id="snakeboard"
     ref="snakeboard"
@@ -18,41 +22,58 @@
 </template>
 
 <script>
+import boardImage from "./assets/sand.jpg";
+import foodImage from "./assets/apple.png";
+
 export default {
   name: "App",
   data() {
     return {
-      food_img: null,
-      board_bg_image: null,
-      board_border: "black",
-      snake_col: "green",
-      snake_border: "darkblue",
-
       snake: null,
-      snakeInit: [
-        { x: 200, y: 200 },
-        { x: 190, y: 200 },
-        { x: 180, y: 200 },
-        { x: 170, y: 200 },
-        { x: 160, y: 200 },
+      snakeInit: [],
+      otherSnakes: [
+        { x: 20 * 12, y: 10 * 12, head: true },
+        { x: 19 * 12, y: 10 * 12 },
+        { x: 18 * 12, y: 10 * 12 },
+        { x: 17 * 12, y: 10 * 12 },
+        { x: 16 * 12, y: 10 * 12 },
+        { x: 15 * 12, y: 10 * 12 },
+        { x: 14 * 12, y: 10 * 12 },
+        { x: 13 * 12, y: 10 * 12 },
       ],
 
       foodNum: 10,
       food: [],
-
-      score: 0,
-      changing_direction: false,
-      dx: 10,
-      dy: 0,
       die: false,
-      boardWidth: 400,
-      boardHeight: 400,
+      changingDirection: false,
+      score: 0,
+      startTimeout: 100,
+
+      scale: 12,
+      boardWidth: 80,
+      boardHeight: 40,
+
+      board_border: "black",
+      snake_col: "green",
+      snake_border: "darkblue",
     };
   },
 
   mounted() {
-    this.snakeboard_ctx = this.$refs.snakeboard.getContext("2d");
-    document.addEventListener("keydown", this.change_direction);
+    this.ctx = this.$refs.snakeboard.getContext("2d");
+    document.addEventListener("keydown", this.changeDirection);
+
+    this.snakeInit = [
+      { x: 20 * this.scale, y: 20 * this.scale },
+      { x: 19 * this.scale, y: 20 * this.scale },
+      { x: 18 * this.scale, y: 20 * this.scale },
+      { x: 17 * this.scale, y: 20 * this.scale },
+      { x: 16 * this.scale, y: 20 * this.scale, head: true },
+    ];
+
+    this.boardWidth *= this.scale;
+    this.boardHeight *= this.scale;
+
     this.start();
   },
 
@@ -66,156 +87,171 @@ export default {
           return true;
         }
       }
+
+      for (let i = 0; i < this.otherSnakes.length; i++) {
+        if (
+          this.otherSnakes[i].x === this.snake[0].x &&
+          this.otherSnakes[i].y === this.snake[0].y
+        ) {
+          return true;
+        }
+      }
       const hitLeftWall = this.snake[0].x < 0;
-      const hitRightWall = this.snake[0].x > this.boardWidth - 10;
+      const hitRightWall = this.snake[0].x > this.boardWidth - this.scale;
       const hitTopWall = this.snake[0].y < 0;
-      const hitBottomWall = this.snake[0].y > this.boardHeight - 10;
+      const hitBottomWall = this.snake[0].y > this.boardHeight - this.scale;
       return hitLeftWall || hitRightWall || hitTopWall || hitBottomWall;
     },
 
     boardImage() {
-      const img = new Image(400, 400);
-      img.src =
-        "http://static9.depositphotos.com/1008280/1225/i/450/depositphotos_12251693-Sand-Texture.jpg";
+      const img = new Image();
+      img.src = boardImage;
       return img;
     },
 
     foodImage() {
-      const img = new Image(10, 10);
-      img.src =
-        "https://sun9-9.userapi.com/impg/AQ8m1qpKcB0r_XRi7UPDhkYG9oCQnIFb3EyEwQ/FYGWAroZaYg.jpg?size=10x10&quality=96&sign=09a0fcd6f1d983e86ee875e80e112e95&type=album";
+      const img = new Image();
+      img.src = foodImage;
       return img;
+    },
+
+    timeout() {
+      return this.startTimeout - this.score / 3;
+    },
+
+    speed() {
+      return (1 - this.timeout / 100 + 1).toFixed(3);
     },
   },
 
   methods: {
     start() {
       this.die = false;
-      this.board_bg_image = this.boardImage;
-      this.food_img = this.foodImage;
 
       this.score = 0;
-      this.dx = 10;
+      this.dx = this.scale;
       this.dy = 0;
       this.snake = JSON.parse(JSON.stringify(this.snakeInit));
 
-      this.main();
-      this.gen_food();
+      this.gameTimeout();
+      this.generateFood();
     },
 
-    main() {
+    gameTimeout() {
+      this.snake = [...this.snake];
+      this.food = [...this.food];
+      this.otherSnakes = [...this.otherSnakes];
+
       if (this.endGame) {
         this.die = true;
         return;
       }
 
-      this.changing_direction = false;
+      this.changingDirection = false;
       setTimeout(() => {
-        this.clear_board();
-        this.drawFood();
-        this.move_snake();
-        this.drawSnake();
-
-        this.main();
-      }, 70 - this.score);
+        this.clearBoard();
+        this.moveSnake();
+        this.gameTimeout();
+      }, this.timeout);
     },
 
-    clear_board() {
-      this.snakeboard_ctx.drawImage(this.board_bg_image, 0, 0);
+    clearBoard() {
+      this.ctx.drawImage(
+        this.boardImage,
+        0,
+        0,
+        this.boardWidth,
+        this.boardHeight
+      );
 
-      this.snakeboard_ctx.strokeStyle = this.board_border;
-      this.snakeboard_ctx.strokeRect(0, 0, this.boardWidth, this.boardHeight);
-    },
-
-    drawSnake() {
-      this.snake.forEach(this.drawSnakePart);
-    },
-
-    drawFood() {
-      this.food.forEach((food) => {
-        this.snakeboard_ctx.drawImage(this.food_img, food.x, food.y);
-      });
+      this.ctx.strokeStyle = this.board_border;
+      this.ctx.strokeRect(0, 0, this.boardWidth, this.boardHeight);
     },
 
     drawSnakePart(snakePart) {
-      this.snakeboard_ctx.fillStyle = this.snake_col;
-      this.snakeboard_ctx.strokeStyle = this.snake_border;
-      this.snakeboard_ctx.fillRect(snakePart.x, snakePart.y, 10, 10);
-      this.snakeboard_ctx.strokeRect(snakePart.x, snakePart.y, 10, 10);
+      this.ctx.fillStyle = snakePart.head ? "red" : this.snake_col;
+      this.ctx.strokeStyle = this.snake_border;
+      this.ctx.fillRect(snakePart.x, snakePart.y, this.scale, this.scale);
+      this.ctx.strokeRect(snakePart.x, snakePart.y, this.scale, this.scale);
     },
 
-    random_food(min, max) {
-      return Math.round((Math.random() * (max - min) + min) / 10) * 10;
+    randomFood(min, max) {
+      return (
+        Math.round((Math.random() * (max - min) + min) / this.scale) *
+        this.scale
+      );
     },
 
-    gen_food() {
+    generateFood() {
       const foodLength = this.food.length || 1;
       for (let i = 0; i <= this.foodNum - foodLength; i++) {
         this.food.push({
-          x: this.random_food(0, this.boardWidth - 10),
-          y: this.random_food(0, this.boardHeight - 10),
+          x: this.randomFood(0, this.boardWidth - this.scale),
+          y: this.randomFood(0, this.boardHeight - this.scale),
         });
       }
 
       this.snake.forEach((part) => {
-        const has_eaten = this.has_eaten_food(part);
+        const has_eaten = this.hasEatenFood(part);
         if (has_eaten !== -1) {
           this.food = this.food.filter((f, idx) => idx !== has_eaten);
         }
       });
     },
 
-    change_direction(event) {
+    changeDirection(event) {
       const LEFT_KEY = 37;
       const RIGHT_KEY = 39;
       const UP_KEY = 38;
       const DOWN_KEY = 40;
 
-      if (this.changing_direction) {
+      if (this.changingDirection) {
         return;
       }
-      this.changing_direction = true;
+      this.changingDirection = true;
+
       const keyPressed = event.keyCode;
-      const goingUp = this.dy === -10;
-      const goingDown = this.dy === 10;
-      const goingRight = this.dx === 10;
-      const goingLeft = this.dx === -10;
+      const goingUp = this.dy === -this.scale;
+      const goingDown = this.dy === this.scale;
+      const goingRight = this.dx === this.scale;
+      const goingLeft = this.dx === -this.scale;
 
       if (keyPressed === LEFT_KEY && !goingRight) {
-        this.dx = -10;
+        this.dx = -this.scale;
         this.dy = 0;
       }
       if (keyPressed === UP_KEY && !goingDown) {
         this.dx = 0;
-        this.dy = -10;
+        this.dy = -this.scale;
       }
       if (keyPressed === RIGHT_KEY && !goingLeft) {
-        this.dx = 10;
+        this.dx = this.scale;
         this.dy = 0;
       }
       if (keyPressed === DOWN_KEY && !goingUp) {
         this.dx = 0;
-        this.dy = 10;
+        this.dy = this.scale;
       }
     },
 
-    move_snake() {
+    moveSnake() {
       const head = {
         x: this.snake[0].x + this.dx,
         y: this.snake[0].y + this.dy,
+        head: true,
       };
-
+      this.snake.forEach((part) => (part.head = false));
       this.snake.unshift(head);
 
-      if (this.has_eaten_food(this.snake[0]) !== -1) {
+      if (this.hasEatenFood(this.snake[0]) !== -1) {
         this.score += 1;
-        this.gen_food();
+        this.generateFood();
       } else {
         this.snake.pop();
       }
     },
 
-    has_eaten_food(part) {
+    hasEatenFood(part) {
       let i = -1;
       this.food.forEach((f, idx) => {
         if (part.x === f.x && part.y === f.y && i === -1) {
@@ -226,7 +262,29 @@ export default {
     },
   },
 
-  watch: {},
+  watch: {
+    snake() {
+      this.snake.forEach(this.drawSnakePart);
+    },
+
+    otherSnakes() {
+      this.otherSnakes.forEach((snake) => {
+        this.drawSnakePart(snake);
+      });
+    },
+
+    food() {
+      this.food.forEach((food) => {
+        this.ctx.drawImage(
+          this.foodImage,
+          food.x,
+          food.y,
+          this.scale,
+          this.scale
+        );
+      });
+    },
+  },
 };
 </script>
 
@@ -237,13 +295,17 @@ export default {
   font-family: "Roboto", cursive;
 }
 
+/*body {*/
+/*  background: url("./assets/grass.jpg");*/
+/*}*/
+
 .endgame {
   position: fixed;
   top: 30%;
   bottom: 30%;
   left: 0;
   right: 0;
-  z-index: 9999;
+  z-index: 3;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -264,6 +326,7 @@ export default {
   left: 20%;
   transform: translate(-50%, -50%);
   font-size: 26px;
+  z-index: 2;
 }
 
 .endgame h2 {
@@ -272,6 +335,9 @@ export default {
 }
 
 button {
+  display: flex;
+  align-items: center;
+
   cursor: pointer;
   font-size: 1.2rem;
   padding: 10px 50px;
