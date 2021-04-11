@@ -1,5 +1,5 @@
 <template>
-  <div class="endgame" v-if="!die">
+  <div class="endgame" v-if="die">
     <h2>Вы проиграли!</h2>
     <h2>Ваш счёт: {{ score }}</h2>
     <button @click="start">Начать заново</button>
@@ -9,7 +9,7 @@
     <div>Ваш счёт: {{ score }}</div>
     <div>Длина змеи: {{ snake?.length ?? 0 }}</div>
     <div>Еды на карте: {{ food.length }}</div>
-    <div>Скорость: {{ timeout }}</div>
+    <div>Задержка: {{ timeout }}</div>
     <div>Скорость: {{ speed }}</div>
   </div>
 
