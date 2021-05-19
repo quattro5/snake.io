@@ -1,11 +1,7 @@
 <template>
-  <div class="endgame" v-if="die">
-    <h2>Вы проиграли!</h2>
-    <h2>Ваш счёт: {{ score }}</h2>
-    <button @click="start">Начать заново</button>
-  </div>
+  <Menu :start="start" :score="score" v-if="die" />
 
-  <div class="score">
+  <div class="statistics">
     <div>Ваш счёт: {{ score }}</div>
     <div>Длина змеи: {{ snake?.length ?? 0 }}</div>
     <div>Еды на карте: {{ food.length }}</div>
@@ -18,7 +14,6 @@
     :width="boardWidth"
     :height="boardHeight"
     :snake="snake"
-    :color="snake_col"
     :otherSnakes="otherSnakes"
     :food="food"
   />
@@ -26,30 +21,30 @@
 
 <script>
 import SnakeField from "./components/SnakeField.vue";
+import Menu from "./components/Menu.vue";
 import { sendRequest, subscribeToState } from "./api";
 
 export default {
   name: "App",
   components: {
     SnakeField,
+    Menu,
   },
 
   data() {
     return {
-      snake: null,
+      snake: [],
       otherSnakes: [],
 
       food: [],
-      die: false,
+      die: true,
       changingDirection: false,
-      score: 0,
+      score: null,
       startTimeout: 100,
 
       scale: 16,
       boardWidth: 80,
       boardHeight: 40,
-
-      snake_col: "crimson",
     };
   },
 
@@ -57,14 +52,12 @@ export default {
     document.addEventListener("keydown", this.changeDirection);
 
     this.snakeInit = [
-      { x: 20, y: 20 },
-      { x: 19, y: 20 },
-      { x: 18, y: 20 },
-      { x: 17, y: 20 },
-      { x: 16, y: 20, head: true },
+      { x: 20, y: 20, color: this.snake_col },
+      { x: 19, y: 20, color: this.snake_col },
+      { x: 18, y: 20, color: this.snake_col },
+      { x: 17, y: 20, color: this.snake_col },
+      { x: 16, y: 20, color: this.snake_col, head: true, nick: "null" },
     ];
-
-    this.start();
 
     subscribeToState((data) => this.updateState(data));
   },
@@ -96,7 +89,7 @@ export default {
     },
 
     timeout() {
-      return this.startTimeout; //- this.score / 3;
+      return this.startTimeout - (this.score || 0) / 3;
     },
 
     speed() {
@@ -114,11 +107,18 @@ export default {
       this.food = newState.food;
     },
 
-    start() {
+    start(settings) {
+      this.snake_col = settings.color || "#000000";
+      this.scale = +settings.scale || 16;
+      this.nick = settings.nick || "null";
+
       console.log("start");
+      if (this.timer) {
+        clearTimeout(this.timer);
+      }
       this.die = false;
 
-      this.score = 0;
+      this.score = null;
       this.dx = 1;
       this.dy = 0;
       this.snake = JSON.parse(JSON.stringify(this.snakeInit));
@@ -137,7 +137,7 @@ export default {
       }
 
       this.changingDirection = false;
-      setTimeout(() => {
+      this.timer = setTimeout(() => {
         this.moveSnake();
         this.gameTimeout();
 
@@ -200,12 +200,15 @@ export default {
       const head = {
         x: this.snake[0].x + this.dx,
         y: this.snake[0].y + this.dy,
+        color: this.snake_col,
         head: true,
+        nick: this.nick,
       };
       this.snake.forEach((part) => (part.head = false));
       this.snake.unshift(head);
 
       if (this.hasEatenFood(this.snake[0]) !== -1) {
+        if (!this.score) this.score = 0;
         this.score += 1;
         this.eatenFood();
       } else {
@@ -227,59 +230,20 @@ export default {
 </script>
 
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Roboto&display=swap");
-
 * {
-  font-family: "Roboto", cursive;
+  font-family: cursive;
 }
 
-/*body {*/
-/*  background: url("./assets/grass.jpg");*/
-/*}*/
-
-.endgame {
-  position: fixed;
-  top: 30%;
-  bottom: 30%;
-  left: 0;
-  right: 0;
-  z-index: 3;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  background: linear-gradient(to right, #12c2e9, #c471ed, #f64f59);
-}
-
-.score {
-  position: absolute;
-  top: 50%;
-  left: 20%;
-  transform: translate(-50%, -50%);
-  font-size: 26px;
-  z-index: 2;
-}
-
-.endgame h2 {
-  color: white;
-  margin: 0 0 30px;
-}
-
-button {
-  display: flex;
-  align-items: center;
-
-  cursor: pointer;
-  font-size: 1.2rem;
-  padding: 10px 50px;
-  border: none;
+.statistics {
+  display: inline-block;
   border-radius: 10px;
-  background: linear-gradient(0deg, white, #eee);
-  box-shadow: 0 10px 10px #0003;
-  transition: all 0.5s ease;
+  border: 1px solid black;
+  padding: 20px;
+  color: white;
+  background: #0005;
 }
 
-button:hover {
-  box-shadow: 0 15px 15px #0005;
+body {
+  background: url("./assets/grass.jpg");
 }
 </style>

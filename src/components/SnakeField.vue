@@ -33,17 +33,10 @@ export default {
       type: Array,
       required: true,
     },
-    color: {
-      type: String,
-      required: true,
-    },
   },
-
-  emits: ["tick"],
 
   data() {
     return {
-      snake_col: "black",
       board_border: "black",
       snake_border: "darkblue",
     };
@@ -51,9 +44,6 @@ export default {
 
   mounted() {
     this.ctx = this.$refs.snakeboard.getContext("2d");
-    this.snake_col = this.color;
-    this.$refs.snakeboard.width = this.boardWidth;
-    this.$refs.snakeboard.height = this.boardHeight;
   },
 
   computed: {
@@ -79,11 +69,10 @@ export default {
   },
 
   methods: {
-    update() {
-      console.log("updated");
-    },
-
     clearBoard() {
+      this.$refs.snakeboard.width = this.boardWidth;
+      this.$refs.snakeboard.height = this.boardHeight;
+
       this.ctx.drawImage(
         this.boardImage,
         0,
@@ -97,8 +86,19 @@ export default {
     },
 
     drawSnakePart(snakePart) {
-      this.ctx.fillStyle = snakePart.head ? "red" : this.snake_col;
+      if (snakePart.head) {
+        this.ctx.fillStyle = "#000";
+        this.ctx.font = "16px serif";
+        this.ctx.fillText(
+          snakePart.nick,
+          (snakePart.x - 1) * this.scale,
+          (snakePart.y - 1) * this.scale
+        );
+      }
+
+      this.ctx.fillStyle = snakePart.head ? "red" : snakePart.color;
       this.ctx.strokeStyle = this.snake_border;
+
       this.ctx.fillRect(
         snakePart.x * this.scale,
         snakePart.y * this.scale,
@@ -128,9 +128,8 @@ export default {
     snake() {
       this.clearBoard();
       this.snake.forEach(this.drawSnakePart);
-      // this.otherSnakes?.forEach(this.drawSnakePart);
-      this.food.forEach(this.drawFood);
     },
+
     otherSnakes() {
       this.otherSnakes?.forEach(this.drawSnakePart);
     },
@@ -148,5 +147,10 @@ export default {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
+
+canvas {
+  border-radius: 10px;
+  border: 4px solid #000;
 }
 </style>

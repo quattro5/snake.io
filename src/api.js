@@ -1,4 +1,5 @@
-const ws = new WebSocket("ws://localhost:2346");
+const wsURL = "ws://localhost:2346";
+const ws = new WebSocket(wsURL);
 
 export function sendRequest(data) {
   const stringifiesMessage = JSON.stringify(data);
@@ -21,4 +22,18 @@ export function subscribeToState(callback) {
     const data = JSON.parse(response.data);
     callback(data);
   };
+}
+
+export function saveSettings(data) {
+  localStorage.setItem("settings", JSON.stringify(data));
+}
+
+export function getSettings() {
+  if (!JSON.parse(localStorage.getItem("settings"))) {
+    localStorage.setItem(
+      "settings",
+      JSON.stringify({ nick: "", color: "#ff0000", scale: 16 })
+    );
+  }
+  return JSON.parse(localStorage.getItem("settings"));
 }
